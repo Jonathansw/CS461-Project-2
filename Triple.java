@@ -113,8 +113,13 @@ public final class Triple {
 
         DataFrame pref = Triple.initPref(inFileName);
 
+        System.out.println("pref init");
+        pref.show();
+
         DataFrame asdf = pref.groupBy("tid").count();
 
+        long pairThreshold = (long)Math.floor(pref.select("tid").distinct().count() * p_thresh);
+        long tripleThreshold = (long)Math.floor(pref.select("tid").distinct().count() * t_thresh);
 
         //Looks for tIDs that are more than 2, if not we can throw them out
         List<Row> rows = asdf.toJavaRDD().collect();
@@ -126,79 +131,69 @@ public final class Triple {
                 transactions.add(row.getString(0));
             }
         }
-        System.out.println(transactions);
-        System.out.println(rows);
 
-        DataFrame aPairs = null;
-        DataFrame vPairs = null;
-        DataFrame lPairs = null;
         DataFrame allPairs = null;
+        DataFrame allTriples = null;
+        DataFrame all_L = null;
+        DataFrame all_V = null;
+        DataFrame all_A = null;
+
         ArrayList<DataFrame> trans = new ArrayList<DataFrame>();
         for(String transaction : transactions) {
             DataFrame qwer = pref.select("tid", "item1", "item2").where(col("tid").equalTo(transaction));
-            trans.add(qwer);
 
-            //aPairs = mergeFrames(aPairs, aPair(qwer));
-            //vPairs = mergeFrames(vPairs, vPair(qwer));
-            //lPairs = mergeFrames(lPairs, lPair(qwer));
+            all_V = vTriples(qwer);
+            all_A = aTriples(qwer);
+            all_L = lTriples(qwer);
+
+            System.out.println(transaction +  " " + "VTriple");
+            all_V.show();
+
+            System.out.println(transaction + " " + "ATriple");
+            all_A.show();
+
+            System.out.println(transaction + " " + "LTriple");
+            all_L.show();
+
+            allTriples = mergeFrames(allTriples, all_A);
+            allTriples = mergeFrames(allTriples, all_L);
+            allTriples = mergeFrames(allTriples, all_V);
+
+            allPairs = mergeFrames(allPairs, qwer);
         }
 
-        //allPairs = mergeFrames(allPairs, aPairs);
-        //allPairs = mergeFrames(allPairs, vPairs);
+        System.out.println("all Pairs");
+        allPairs.show();
 
-        DataFrame Triples = null;
+        System.out.println("All Triples");
+        allTriples.show();
 
-        //lTriples
-        DataFrame tempTriple = pref.select("item1", "item2")
-                .join(pref.select(pref.col("item1").as("temp_item1")
-                ,pref.col("item2").as("item3"))
-                ,col("item2").equalTo(col("temp_item1")).and(col("item2").$less(col("item3"))));
-        tempTriple = tempTriple.select("item1", "item2", "item3");
-        tempTriple = tempTriple.filter(tempTriple.col("item1").notEqual(tempTriple.col("item3")));
-
-        //lTriples
-        DataFrame tempTriple1 = pref.select("item1", "item2");
-
-        System.out.println("pref init");
-        pref.show();
-
-        System.out.println("Triple init");
-        tempTriple.show();
+        DataFrame frequentTriples = allTriples.groupBy("item1", "item2", "item3").count();
+        System.out.println("count");
+        frequentTriples.show();
+        frequentTriples = allTriples.filter(allTriples.col("count").$greater$eq(tripleThreshold));
 
 
-        DataFrame tempA = aPair(pref);
-        System.out.println("A");
-        tempA.show();
-
-        DataFrame tempV = vPair(pref);
-        System.out.println("v");
-        tempV.show();
-
-        DataFrame tempL = lPair(pref);
-        System.out.println("l");
-        tempL.show();
-
-
-
-        long pairThreshold = (long)Math.floor(pref.select("tid").distinct().count() * p_thresh);
-        long tripleThreshold = (long)Math.floor(pref.select("tid").distinct().count() * t_thresh);
         System.out.println("PairThreshold = " + pairThreshold + " TripleThreshold = " + tripleThreshold);
 
 
-        DataFrame frequentPairs = pref.groupBy("item1", "item2").count();
+        DataFrame frequentPairs = allPairs.groupBy("item1", "item2").count();
         frequentPairs = frequentPairs.filter(frequentPairs.col("count").$greater$eq(pairThreshold));
 
         System.out.println("frequent Pairs");
         frequentPairs.show();
-        /*
 
-        DataFrame frequentTriples = candidateTriples.groupBy("item1", "item2", "item3").count();
+        DataFrame tempA = aTriples(pref);
+        System.out.println("A");
+        tempA.show();
 
-        frequentTriples.show();
-        frequentTriples = frequentTriples.filter(frequentTriples.col("count").$greater$eq(tripleThreshold));
+        DataFrame tempV = vTriples(pref);
+        System.out.println("v");
+        tempV.show();
 
-        frequentTriples.show();
-        */
+        DataFrame tempL = lTriples(pref);
+        System.out.println("l");
+        tempL.show();
 
 
         DataFrame lTriples = pref;
@@ -239,40 +234,44 @@ public final class Triple {
     	}
     }
     
-    public static DataFrame aPair(DataFrame d) {
-    	//Apairs logic
-    	//Return the Apairs
-    	//System.out.println("A Triples");
+    public static DataFrame aTriples(DataFrame d) {
         DataFrame aaTriples = d.select("item1", "item2")
         		.join(d.select(d.col("item1").as("temp_item1"), d.col("item2").as("item3"))
         		,col("item1").equalTo(col("temp_item1"))
         		.and(col("item2").notEqual(col("item3"))
         		.and(col("item2").$less(col("item3")))));
         aaTriples = aaTriples.select(aaTriples.col("item2").as("item1"), aaTriples.col("temp_item1").as("item2"), aaTriples.col("item3")).dropDuplicates();
-        
-        //aaTriples.show();
-        //System.out.println("---------------------------------------");
+
     	return aaTriples;
     }
 
-    public static DataFrame vPair(DataFrame d){
+    public static DataFrame vTriples(DataFrame d){
         DataFrame df = d.select("item1", "item2")
                 .join(d.select(d.col("item2").as("temp_item2")
                         ,d.col("item1").as("item3"))
                         ,col("item2").equalTo(col("temp_item2")).and(col("item2").$less(col("item3"))));
         df = df.select("item1", "item2", "item3");
-        df = df.filter(df.col("item1").notEqual(df.col("item3"))).dropDuplicates();
+        df = df.filter(df.col("item1").notEqual(df.col("item3")));
         return df;
     }
 
-    public static DataFrame lPair(DataFrame d){
-        DataFrame df = d.select("item1", "item2")
+    public static DataFrame lTriples(DataFrame d){
+        DataFrame df = null;
+        DataFrame onePart = d.select("item1", "item2")
                 .join(d.select(d.col("item1").as("temp_item1")
                         ,d.col("item2").as("item3"))
                         ,col("item2").equalTo(col("temp_item1"))
                                 .and(col("item2").$less(col("item3"))));
+        onePart = onePart.select("item1", "item2", "item3");
 
-        df = df.select("item1", "item2", "item3").dropDuplicates();
+        DataFrame secondPart = d.select("item1", "item2")
+                .join(d.select(d.col("item2").as("temp_item2")
+                ,d.col("item1").as("item3")),col("item1").equalTo(col("temp_item2"))
+                .and(col("item2").$less(col("item3"))));
+        secondPart = secondPart.select("item1", "item2", "item3");
+
+        df = onePart.unionAll(secondPart);
+
         return df;
     }
 }
