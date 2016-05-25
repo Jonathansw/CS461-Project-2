@@ -26,6 +26,8 @@ import static org.apache.spark.sql.functions.col;
 /**
  * @author LIST YOUR NAMES HERE
  *         Frequent preference mining with Apache Spark SQL.
+ *         Jonathan Wang
+ *         Steven Calabro
  */
 public final class Triple {
 
@@ -135,8 +137,6 @@ public final class Triple {
             }
         }
 
-        DataFrame allPairs = null;
-        DataFrame allTriples = null;
         DataFrame all_L = null;
         DataFrame all_V = null;
         DataFrame all_A = null;
@@ -144,13 +144,13 @@ public final class Triple {
         DataFrame V = null;
         DataFrame A = null;
 
-        ArrayList<DataFrame> trans = new ArrayList<DataFrame>();
+        //Goes through and grabs all TIDs where there are more than 2, creates triples, if possible
         for(String transaction : transactions) {
-            DataFrame qwer = pref.select("tid", "item1", "item2").where(col("tid").equalTo(transaction));
+            DataFrame trans = pref.select("tid", "item1", "item2").where(col("tid").equalTo(transaction));
 
-            all_V = vTriples(qwer);
-            all_A = aTriples(qwer);
-            all_L = lTriples(qwer);
+            all_V = vTriples(trans);
+            all_A = aTriples(trans);
+            all_L = lTriples(trans);
 
             V = mergeFrames(V, all_V);
             A = mergeFrames(A, all_A);
@@ -166,7 +166,7 @@ public final class Triple {
         DataFrame A_triple = A.groupBy("item1", "item2", "item3").count();
         A_triple = A_triple.filter(A_triple.col("count").$greater(tripleThreshold));
 
-
+        //sets the Triples to the created ones
         DataFrame lTriples = L_triple;
         DataFrame vTriples = V_triple;
         DataFrame aTriples = A_triple;
@@ -194,7 +194,14 @@ public final class Triple {
         sparkContext.stop();
 
     }
-    
+
+
+    /**
+     * Merges two DataFrames together, using unionAll with null error handling
+     * @param d1
+     * @param d2
+     * @return
+     */
     public static DataFrame mergeFrames(DataFrame d1, DataFrame d2) {
     	if(d1 != null && d2 != null) {
     		return d1.unionAll(d2);
@@ -204,7 +211,12 @@ public final class Triple {
     		return d2;
     	}
     }
-    
+
+    /**
+     * Takes in a DataFrame and returns A-Triples
+     * @param d
+     * @return
+     */
     public static DataFrame aTriples(DataFrame d) {
         DataFrame aaTriples = d.select("item1", "item2")
         		.join(d.select(d.col("item1").as("temp_item1"), d.col("item2").as("item3"))
@@ -212,20 +224,28 @@ public final class Triple {
         		.and(col("item2").notEqual(col("item3"))
         		.and(col("item2").$less(col("item3")))));
         aaTriples = aaTriples.select(aaTriples.col("item2").as("item1"), aaTriples.col("temp_item1").as("item2"), aaTriples.col("item3")).dropDuplicates();
-
     	return aaTriples;
     }
 
+    /**
+     * Takes in DataFrame and returns V-Triples
+     * @param d
+     * @return
+     */
     public static DataFrame vTriples(DataFrame d){
         DataFrame df = d.select("item1", "item2")
                 .join(d.select(d.col("item2").as("temp_item2"),d.col("item1").as("item3"))
                         ,col("item2").equalTo(col("temp_item2")).and(col("item1").$less(col("item3"))));
         df = df.select("item1", "item2", "item3");
-        df.show();
         df = df.filter(df.col("item1").notEqual(df.col("item3")));
         return df;
     }
 
+    /**
+     * Takes in a DataFrame and returns L-Triples take account for both {[1,2],[2,3]} and {[2,1],[3,2]}
+     * @param d
+     * @return
+     */
     public static DataFrame lTriples(DataFrame d){
         DataFrame df = null;
         DataFrame onePart = d.select("item1", "item2")
