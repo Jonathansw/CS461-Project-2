@@ -230,14 +230,12 @@ public final class Triple {
     }
     
     public static DataFrame mergeFrames(DataFrame d1, DataFrame d2) {
-    	if(d1 == null) {
+    	if(d1 != null && d2 != null) {
+    		return d1.unionAll(d2);
+    	} else if(d1 != null) {
     		return d1;
-    	} else if(d2 == null) {
-    		return d2;
     	} else {
-    		//Do the 2 dataframe merges
-    		//Ie join statements
-    		return null;
+    		return d2;
     	}
     }
     
