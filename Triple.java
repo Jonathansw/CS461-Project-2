@@ -113,16 +113,19 @@ public final class Triple {
 
         DataFrame pref = Triple.initPref(inFileName);
 
-        System.out.println("pref init");
-        pref.show();
-
-        DataFrame asdf = pref.groupBy("tid").count();
-
+        //Creates the threshold for both pair and triples
         long pairThreshold = (long)Math.floor(pref.select("tid").distinct().count() * p_thresh);
         long tripleThreshold = (long)Math.floor(pref.select("tid").distinct().count() * t_thresh);
 
+        System.out.println("pref init");
+        pref.show();
+        System.out.println("PairThreshold = " + pairThreshold + " TripleThreshold = " + tripleThreshold);
+
+        //group by tid, if there is only 1 transaction we can throw it out because there can be no double
+        DataFrame temp = pref.groupBy("tid").count();
+
         //Looks for tIDs that are more than 2, if not we can throw them out
-        List<Row> rows = asdf.toJavaRDD().collect();
+        List<Row> rows = temp.toJavaRDD().collect();
         ArrayList<String> transactions = new ArrayList<String>();
 
         for(Row row: rows){
@@ -137,6 +140,9 @@ public final class Triple {
         DataFrame all_L = null;
         DataFrame all_V = null;
         DataFrame all_A = null;
+        DataFrame L = null;
+        DataFrame V = null;
+        DataFrame A = null;
 
         ArrayList<DataFrame> trans = new ArrayList<DataFrame>();
         for(String transaction : transactions) {
@@ -146,59 +152,24 @@ public final class Triple {
             all_A = aTriples(qwer);
             all_L = lTriples(qwer);
 
-            System.out.println(transaction +  " " + "VTriple");
-            all_V.show();
-
-            System.out.println(transaction + " " + "ATriple");
-            all_A.show();
-
-            System.out.println(transaction + " " + "LTriple");
-            all_L.show();
-
-            allTriples = mergeFrames(allTriples, all_A);
-            allTriples = mergeFrames(allTriples, all_L);
-            allTriples = mergeFrames(allTriples, all_V);
-
-            allPairs = mergeFrames(allPairs, qwer);
+            V = mergeFrames(V, all_V);
+            A = mergeFrames(A, all_A);
+            L = mergeFrames(L, all_L);
         }
 
-        System.out.println("all Pairs");
-        allPairs.show();
 
-        System.out.println("All Triples");
-        allTriples.show();
-
-        DataFrame frequentTriples = allTriples.groupBy("item1", "item2", "item3").count();
-        System.out.println("count");
-        frequentTriples.show();
-        frequentTriples = allTriples.filter(allTriples.col("count").$greater$eq(tripleThreshold));
+        //filters the triples for each type so that they are greater than the triple threshold
+        DataFrame L_triple = L.groupBy("item1", "item2", "item3").count();
+        L_triple = L_triple.filter(L_triple.col("count").$greater(tripleThreshold));
+        DataFrame V_triple = V.groupBy("item1", "item2", "item3").count();
+        V_triple = V_triple.filter(V_triple.col("count").$greater(tripleThreshold));
+        DataFrame A_triple = A.groupBy("item1", "item2", "item3").count();
+        A_triple = A_triple.filter(A_triple.col("count").$greater(tripleThreshold));
 
 
-        System.out.println("PairThreshold = " + pairThreshold + " TripleThreshold = " + tripleThreshold);
-
-
-        DataFrame frequentPairs = allPairs.groupBy("item1", "item2").count();
-        frequentPairs = frequentPairs.filter(frequentPairs.col("count").$greater$eq(pairThreshold));
-
-        System.out.println("frequent Pairs");
-        frequentPairs.show();
-
-        DataFrame tempA = aTriples(pref);
-        System.out.println("A");
-        tempA.show();
-
-        DataFrame tempV = vTriples(pref);
-        System.out.println("v");
-        tempV.show();
-
-        DataFrame tempL = lTriples(pref);
-        System.out.println("l");
-        tempL.show();
-
-
-        DataFrame lTriples = pref;
-        DataFrame vTriples = pref;
-        DataFrame aTriples = pref;
+        DataFrame lTriples = L_triple;
+        DataFrame vTriples = V_triple;
+        DataFrame aTriples = A_triple;
 
 
         try {
@@ -247,10 +218,10 @@ public final class Triple {
 
     public static DataFrame vTriples(DataFrame d){
         DataFrame df = d.select("item1", "item2")
-                .join(d.select(d.col("item2").as("temp_item2")
-                        ,d.col("item1").as("item3"))
-                        ,col("item2").equalTo(col("temp_item2")).and(col("item2").$less(col("item3"))));
+                .join(d.select(d.col("item2").as("temp_item2"),d.col("item1").as("item3"))
+                        ,col("item2").equalTo(col("temp_item2")).and(col("item1").$less(col("item3"))));
         df = df.select("item1", "item2", "item3");
+        df.show();
         df = df.filter(df.col("item1").notEqual(df.col("item3")));
         return df;
     }
