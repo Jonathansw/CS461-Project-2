@@ -1,4 +1,4 @@
-package edu.drexel.cs461.preference;
+//package edu.drexel.cs461.preference;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -137,13 +137,14 @@ public final class Triple {
         for(String transaction : transactions) {
             DataFrame qwer = pref.select("tid", "item1", "item2").where(col("tid").equalTo(transaction));
             trans.add(qwer);
-            aPairs = merge(aPairs, aPair(qwer));
-            vPairs = merge(vPairs, vPair(qwer));
-            lPairs = merge(lPairs, lPair(qwer));
+
+            aPairs = mergeFrames(aPairs, aPair(qwer));
+            //vPairs = mergeFrames(vPairs, vPair(qwer));
+            //lPairs = mergeFrames(lPairs, lPair(qwer));
         }
 
-        allPairs = merge(allPairs, aPairs);
-        allPairs = merge(allPairs, vPairs);
+        //allPairs = mergeFrames(allPairs, aPairs);
+        //allPairs = mergeFrames(allPairs, vPairs);
 
         DataFrame Triples = null;
 
@@ -240,5 +241,33 @@ public final class Triple {
         System.out.println("Done");
         sparkContext.stop();
 
+    }
+    
+    public static DataFrame mergeFrames(DataFrame d1, DataFrame d2) {
+    	if(d1 == null) {
+    		return d1;
+    	} else if(d2 == null) {
+    		return d2;
+    	} else {
+    		//Do the 2 dataframe merges
+    		//Ie join statements
+    		return null;
+    	}
+    }
+    
+    public static DataFrame aPair(DataFrame d) {
+    	//Apairs logic
+    	//Return the Apairs
+    	//System.out.println("A Triples");
+        DataFrame aaTriples = d.select("item1", "item2")
+        		.join(d.select(d.col("item1").as("temp_item1"), d.col("item2").as("item3"))
+        		,col("item1").equalTo(col("temp_item1"))
+        		.and(col("item2").notEqual(col("item3"))
+        		.and(col("item2").$less(col("item3")))));
+        aaTriples = aaTriples.select(aaTriples.col("item2").as("item1"), aaTriples.col("temp_item1").as("item2"), aaTriples.col("item3"));
+        
+        //aaTriples.show();
+        //System.out.println("---------------------------------------");
+    	return aaTriples;
     }
 }
