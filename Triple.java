@@ -119,10 +119,6 @@ public final class Triple {
         long pairThreshold = (long)Math.floor(pref.select("tid").distinct().count() * p_thresh);
         long tripleThreshold = (long)Math.floor(pref.select("tid").distinct().count() * t_thresh);
 
-        System.out.println("pref init");
-        pref.show();
-        System.out.println("PairThreshold = " + pairThreshold + " TripleThreshold = " + tripleThreshold);
-
         //group by tid, if there is only 1 transaction we can throw it out because there can be no double
         DataFrame temp = pref.groupBy("tid").count();
 
