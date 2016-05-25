@@ -1,4 +1,4 @@
-//package edu.drexel.cs461.preference;
+package edu.drexel.cs461.preference;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -138,7 +138,7 @@ public final class Triple {
             DataFrame qwer = pref.select("tid", "item1", "item2").where(col("tid").equalTo(transaction));
             trans.add(qwer);
 
-            aPairs = mergeFrames(aPairs, aPair(qwer));
+            //aPairs = mergeFrames(aPairs, aPair(qwer));
             //vPairs = mergeFrames(vPairs, vPair(qwer));
             //lPairs = mergeFrames(lPairs, lPair(qwer));
         }
@@ -166,22 +166,17 @@ public final class Triple {
         tempTriple.show();
 
 
+        DataFrame tempA = aPair(pref);
+        System.out.println("A");
+        tempA.show();
 
-        //v triples
-        DataFrame tempTriple2 = pref.select("item1", "item2")
-                .join(pref.select(pref.col("item2").as("temp_item2")
-                ,pref.col("item1").as("item3"))
-                ,col("item2").equalTo(col("temp_item2")).and(col("item2").$less(col("item3"))));
-        tempTriple2 = tempTriple2.select("item1", "item2", "item3");
-        tempTriple2 = tempTriple2.filter(tempTriple2.col("item1").notEqual(tempTriple2.col("item3")));
+        DataFrame tempV = vPair(pref);
+        System.out.println("v");
+        tempV.show();
 
-        System.out.println("vTriples");
-        tempTriple2.show();
-
-        //a triples
-
-
-
+        DataFrame tempL = lPair(pref);
+        System.out.println("l");
+        tempL.show();
 
 
 
@@ -195,24 +190,15 @@ public final class Triple {
 
         System.out.println("frequent Pairs");
         frequentPairs.show();
+        /*
 
-        DataFrame candidateTriples = frequentPairs.select("item1", "item2")
-                .join(frequentPairs.select(frequentPairs.col("item1").as("temp_item1")
-                        ,frequentPairs.col("item2").as("item3"))
-                        ,col("item2").equalTo(col("temp_item1"))
-                                .and(col("item2").$less(col("item3"))));
-
-        candidateTriples.show();
-
-        candidateTriples = candidateTriples.select("item1", "item2", "item3");
-
-        candidateTriples.show();
         DataFrame frequentTriples = candidateTriples.groupBy("item1", "item2", "item3").count();
 
         frequentTriples.show();
         frequentTriples = frequentTriples.filter(frequentTriples.col("count").$greater$eq(tripleThreshold));
 
         frequentTriples.show();
+        */
 
 
         DataFrame lTriples = pref;
@@ -264,10 +250,31 @@ public final class Triple {
         		,col("item1").equalTo(col("temp_item1"))
         		.and(col("item2").notEqual(col("item3"))
         		.and(col("item2").$less(col("item3")))));
-        aaTriples = aaTriples.select(aaTriples.col("item2").as("item1"), aaTriples.col("temp_item1").as("item2"), aaTriples.col("item3"));
+        aaTriples = aaTriples.select(aaTriples.col("item2").as("item1"), aaTriples.col("temp_item1").as("item2"), aaTriples.col("item3")).dropDuplicates();
         
         //aaTriples.show();
         //System.out.println("---------------------------------------");
     	return aaTriples;
+    }
+
+    public static DataFrame vPair(DataFrame d){
+        DataFrame df = d.select("item1", "item2")
+                .join(d.select(d.col("item2").as("temp_item2")
+                        ,d.col("item1").as("item3"))
+                        ,col("item2").equalTo(col("temp_item2")).and(col("item2").$less(col("item3"))));
+        df = df.select("item1", "item2", "item3");
+        df = df.filter(df.col("item1").notEqual(df.col("item3"))).dropDuplicates();
+        return df;
+    }
+
+    public static DataFrame lPair(DataFrame d){
+        DataFrame df = d.select("item1", "item2")
+                .join(d.select(d.col("item1").as("temp_item1")
+                        ,d.col("item2").as("item3"))
+                        ,col("item2").equalTo(col("temp_item1"))
+                                .and(col("item2").$less(col("item3"))));
+
+        df = df.select("item1", "item2", "item3").dropDuplicates();
+        return df;
     }
 }
